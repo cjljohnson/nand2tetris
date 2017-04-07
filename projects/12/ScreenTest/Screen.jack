@@ -1,0 +1,233 @@
+// This file is part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/12/Screen.jack
+
+/**
+ * A library of functions for displaying graphics on the screen.
+ * The Hack physical screen consists of 512 rows (indexed 0..511, top to bottom)
+ * of 256 pixels each (indexed 0..255, left to right). The top left pixel on 
+ * the screen is indexed (0,0).
+ */
+class Screen {
+
+    static boolean col;
+    static array bit;
+
+    // Base address of screen in ram = 16384
+
+    /** Initializes the Screen. */
+    function void init() {
+        let col = true;
+
+        let bit = Array.new(16);
+        let bit[0] = 1;
+        let bit[1] = 2;
+        let bit[2] = 4;
+        let bit[3] = 8;
+        let bit[4] = 16;
+        let bit[5] = 32;
+        let bit[6] = 64;
+        let bit[7] = 128;
+        let bit[8] = 256;
+        let bit[9] = 512;
+        let bit[10] = 1024;
+        let bit[11] = 2048;
+        let bit[12] = 4096;
+        let bit[13] = 8192;
+        let bit[14] = 16384;
+        let bit[15] = 32767+1;
+
+        return;
+    }
+
+    /** Erases the entire screen. */
+    function void clearScreen() {
+        var int i;
+        let i = 16384;
+
+        while (i < 24576) {
+            do Memory.poke(i, 0);
+            let i = i + 1;
+        }
+        return;
+    }
+
+    /** Sets the current color, to be used for all subsequent drawXXX commands.
+     *  Black is represented by true, white by false. */
+    function void setColor(boolean b) {
+        let col = b;
+        return;
+    }
+
+    /** Draws the (x,y) pixel, using the current color. */
+    function void drawPixel(int x, int y) {
+        var int word;
+        var int mem;
+        var int bitIndex;
+
+        let word = 16384 + (x / 16) + (y * 32);
+
+        let mem = Memory.peek(word);
+
+        // Bit of word to change, x % 16
+        let bitIndex = x & 15;
+
+        if (col) {
+            do Memory.poke(word, mem | bit[bitIndex]);
+        } else {
+            do Memory.poke(word, mem & ~(bit[bitIndex]));
+        }
+        return;
+    }
+
+    /** Draws a line from pixel (x1,y1) to pixel (x2,y2), using the current color. */
+    function void drawLine(int x1, int y1, int x2, int y2) {
+
+        var int a, b, dx, dy, xchange, ychange, diff, dxabs, dyabs;
+
+        if (x1 = x2) {
+            do Screen.drawVertLine(x1, y1, x2, y2);
+            return;
+        }
+
+        if (y1 = y2) {
+            do Screen.drawHorizLine(x1, y1, x2, y2);
+            return;
+        }
+
+        let a = 0;
+        let b = 0;
+        let dx = x2 - x1;
+        let dy = y2 - y1;
+        let dxabs = Math.abs(dx);
+        let dyabs = Math.abs(dy);
+        let diff = 0;
+        
+        if (dx > 0) {
+            let xchange = 1;
+        } else {
+            let xchange = -1;
+        }
+
+        if (dy > 0) {
+            let ychange = 1;
+        } else {
+            let ychange = -1;
+        }
+
+        while (~((a = dx) & (b = dy))) {
+            if (diff < 0) {
+                let a = a + xchange;
+                let diff = diff + dyabs;
+            } else {
+                let b = b + ychange;
+                let diff = diff - dxabs;
+            }
+
+
+            do Screen.drawPixel(x1 + a, y1 + b);
+        }
+        return;
+
+    }
+
+    function void drawHorizLine(int x1, int y1, int x2, int y2) {
+        var boolean isXPositive;
+        var int xPos;
+
+        if (x2 > x1) {
+            let isXPositive = true;
+        } else {
+            let isXPositive = false;
+        }
+        let xPos = x1;
+
+        while (~(xPos = x2)) {
+            do Screen.drawPixel(xPos, y1);
+            if (isXPositive) {
+                let xPos = xPos + 1;
+            } else {
+                let xPos = xPos - 1;
+            }
+        }
+
+        do Screen.drawPixel(x2, y2);
+
+        return;
+    }
+
+    function void drawVertLine(int x1, int y1, int x2, int y2) {
+        var boolean isYPositive;
+        var int yPos;
+
+        if (y2 > y1) {
+            let isYPositive = true;
+        } else {
+            let isYPositive = false;
+        }
+        let yPos = y1;
+
+        while (~(yPos = y2)) {
+            do Screen.drawPixel(x1, yPos);
+            if (isYPositive) {
+                let yPos = yPos + 1;
+            } else {
+                let yPos = yPos - 1;
+            }
+        }
+
+        do Screen.drawPixel(x2, y2);
+
+        return;
+    }
+
+
+    /** Draws a filled rectangle whose top left corner is (x1, y1)
+     * and bottom right corner is (x2,y2), using the current color. */
+    function void drawRectangle(int x1, int y1, int x2, int y2) {
+        var boolean isYPositive;
+        var int yPos;
+
+        if (y2 > y1) {
+            let isYPositive = true;
+        } else {
+            let isYPositive = false;
+        }
+
+        let yPos = y1;
+
+        while (~(yPos = y2)) {
+            do Screen.drawHorizLine(x1, yPos, x2, yPos);
+            if (isYPositive) {
+                let yPos = yPos + 1;
+            } else {
+                let yPos = yPos - 1;
+            }
+        }
+
+        do Screen.drawHorizLine(x1, yPos, x2, yPos);
+
+        return;
+    }
+
+    /** Draws a filled circle of radius r<=181 around (x,y), using the current color. */
+    function void drawCircle(int x, int y, int r) {
+        var int dy;
+        var int rsquared;
+        var int dx;
+
+        let dy = -r;
+        let rsquared = r * r;
+
+        while (~(dy > r)) {
+            let dx = Math.sqrt(rsquared - (dy * dy));
+            do Screen.drawHorizLine(x - dx, y + dy, x + dx, y + dy);
+            let dy = dy + 1;
+        }
+
+
+
+        return;
+    }
+}
